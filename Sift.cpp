@@ -271,8 +271,8 @@ void findOrientation(Mat ***GaussianPyramid, std::vector<SFKP> &siftpoints, int 
 						int y_tran = y1 - y + out_radius;
 						float dx = (float)GaussianPyramid[o][r + 1]->at<float>(x1 + 1, y1) - (float)GaussianPyramid[o][r + 1]->at<float>(x1 - 1, y1);
 						float dy = (float)GaussianPyramid[o][r + 1]->at<float>(x1, y1 + 1) - (float)GaussianPyramid[o][r + 1]->at<float>(x1, y1 - 1);
-						float gweight = 1.f/(2.f*Pi*sigma15_ary[r]*sigma15_ary[r])*exp(-((x1 - x)*(x1 - x) + (y1 - y)*(y1 - y)) / (sigma15_ary[r] * sigma15_ary[r]* 2.f));
-						Magnitude_Matrix[x_tran][y_tran] = sqrtf(dx*dx + dy*dy)*gweight;
+						//float gweight = 1.f/(2.f*Pi*sigma15_ary[r]*sigma15_ary[r])*exp(-((x1 - x)*(x1 - x) + (y1 - y)*(y1 - y)) / (sigma15_ary[r] * sigma15_ary[r]* 2.f));
+						Magnitude_Matrix[x_tran][y_tran] = sqrtf(dx*dx + dy*dy);// *gweight;
 						Orientation_Matrix[x_tran][y_tran] = fastAtan2(dx, dy);
 						//printf("%f,%f\n", Magnitude_Matrix[x_tran][y_tran], Orientation_Matrix[x_tran][y_tran]);
 					}
@@ -292,7 +292,7 @@ void findOrientation(Mat ***GaussianPyramid, std::vector<SFKP> &siftpoints, int 
 			int *ort_index = (int*)calloc(total_max, sizeof(int));
 			for (int i = 0; i < 36; i++)
 			{
-				printf("%f\t", histogram[i]);
+				//printf("%f\t", histogram[i]);
 				if (max[total_max - 1] < histogram[i])
 				{
 					max[total_max - 1] = histogram[i];
@@ -301,23 +301,24 @@ void findOrientation(Mat ***GaussianPyramid, std::vector<SFKP> &siftpoints, int 
 			}
 			for (int i = 0; i < 36; i++)
 			{
-				if (histogram[i] > 0.8*max[0] && i != ort_index[0] - 1)
+				if (histogram[i] >=0.8*max[0] && i != ort_index[0] - 1 &&histogram[i]>histogram[i-1>=0?i-1:35]
+					&& histogram[i]>histogram[i+1>35?0:35])
 				{
 					max = (float*)realloc(max, ++total_max * sizeof(float));
 					ort_index = (int*)realloc(ort_index, total_max * sizeof(int));
 					max[total_max - 1] = histogram[i];
 					ort_index[total_max - 1] = i + 1;
 				}
-				//printf("%f\t", histogram[i]);
 			}
-			/*for (int m = 0; m < out_radius * 2 + 1; m++)
+			for (int m = 0; m < out_radius * 2 + 1; m++)
 			{
 				for (int n = 0; n < out_radius * 2 + 1; n++)
 				{
+					//printf("%f\t", Magnitude_Matrix[m][n]);
 					float gweight = 1.f / (2.f*Pi*sigma15_ary[r] * sigma15_ary[r])*exp(-((m - out_radius)*(m - out_radius) + (n - out_radius)*(n - out_radius)) / (sigma15_ary[r] * sigma15_ary[r] * 2.f));
 					Magnitude_Matrix[m][n] = gweight*Magnitude_Matrix[m][n];
 				}
-			}*/
+			}
 			for (int i = 0; i < total_max; i++)
 			{
 				SFKP *s1 = (SFKP*)malloc(sizeof(SFKP));
@@ -558,14 +559,14 @@ float tri_linear(float center_x, float center_y, int point_x, int point_y, float
 void showMatchImage(Mat src1, std::vector<SFKP>siftpoints1, Mat src2, std::vector<SFKP>siftpoints2,Mat output, std::vector<MP> matchedpoints)
 {
 	int sum = 0;
-	int op_row = src1.rows > src2.rows ? src2.rows : src1.rows;
-	int op_col = src1.rows > src2.rows ? src1.cols : src2.cols;
+	int op_row = src1.rows >=src2.rows ? src2.rows : src1.rows;
+	int op_col = src1.rows >= src2.rows ? src1.cols : src2.cols;
 	for (int i = 0; i < output.rows; i++)
 	{
 		uchar *op = output.ptr<uchar>(i);
 		if (i >= op_row)
 		{
-			const uchar *sp = src1.rows > src2.rows ? src1.ptr<uchar>(i) : src2.ptr<uchar>(i);
+			const uchar *sp = src1.rows >=src2.rows ? src1.ptr<uchar>(i) : src2.ptr<uchar>(i);
 			for (int j = 0; j < op_col*output.channels(); j++)
 			{
 				*op++ = *sp++;
@@ -573,8 +574,8 @@ void showMatchImage(Mat src1, std::vector<SFKP>siftpoints1, Mat src2, std::vecto
 		}
 		else
 		{
-			const uchar *sp1 = src1.rows > src2.rows ? src1.ptr<uchar>(i) : src2.ptr<uchar>(i);
-			const uchar *sp2 = src1.rows > src2.rows ? src2.ptr<uchar>(i) : src1.ptr<uchar>(i);
+			const uchar *sp1 = src1.rows >= src2.rows ? src1.ptr<uchar>(i) : src2.ptr<uchar>(i);
+			const uchar *sp2 = src1.rows >= src2.rows ? src2.ptr<uchar>(i) : src1.ptr<uchar>(i);
 			for (int j = 0; j < output.cols*output.channels(); j++)
 			{
 				if (j < op_col*output.channels())
@@ -592,40 +593,37 @@ void showMatchImage(Mat src1, std::vector<SFKP>siftpoints1, Mat src2, std::vecto
 		int next_min_index = i;
 		float rotate_angle = 0.f;
 		int step = 1;
-		if (std::abs(matchedpoints[i].rotation-rotate_angle)<=10)
+		//Point pt1 = Point(siftpoints1[matchedpoints[min_dist_index].input_num].column, siftpoints1[matchedpoints[min_dist_index].input_num].row);
+		//Point pt2 = Point(siftpoints2[matchedpoints[min_dist_index].compare_num].column + src1.cols, siftpoints2[matchedpoints[min_dist_index].compare_num].row);
+		//circle(output, pt1, 5, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 2, 10);
+		//circle(output, pt2, 5, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 2, 10);
+		//line(output, pt1, pt2, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 1);
+		//sum++;
+		while (i<matchedpoints.size()-step && siftpoints1[matchedpoints[i].input_num].row == siftpoints1[matchedpoints[i + step].input_num].row&&
+			siftpoints1[matchedpoints[i].input_num].column == siftpoints1[matchedpoints[i + step].input_num].column)
+		{
+			next_min_index = matchedpoints[min_dist_index].eu_distance > matchedpoints[i + step].eu_distance ? min_dist_index : (i + step);
+			min_dist_index = matchedpoints[min_dist_index].eu_distance > matchedpoints[i + step].eu_distance ? (i+step): min_dist_index;
+			++step;
+		}
+		for (int j = 1;j<=step&&i+j<matchedpoints.size();++j)
+		{
+			if (matchedpoints[next_min_index].eu_distance>matchedpoints[i+j].eu_distance&&
+				matchedpoints[i+j].eu_distance!=matchedpoints[min_dist_index].eu_distance)
+			{
+				next_min_index = i + j;
+				break;
+			}
+		}
+		if (next_min_index == min_dist_index || matchedpoints[min_dist_index].eu_distance / matchedpoints[next_min_index].eu_distance <= 0.8)
 		{
 			Point pt1 = Point(siftpoints1[matchedpoints[min_dist_index].input_num].column, siftpoints1[matchedpoints[min_dist_index].input_num].row);
 			Point pt2 = Point(siftpoints2[matchedpoints[min_dist_index].compare_num].column + src1.cols, siftpoints2[matchedpoints[min_dist_index].compare_num].row);
 			circle(output, pt1, 5, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 2, 10);
 			circle(output, pt2, 5, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 2, 10);
-			line(output, pt1, pt2, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 2);
+			line(output, pt1, pt2, Scalar((10 * i + i) % 255, i % 255, (i + 5 * i) % 255), 1);
 			sum++;
 		}
-		//while (i<matchedpoints.size()-step && siftpoints1[matchedpoints[i].input_num].row == siftpoints1[matchedpoints[i + step].input_num].row&&
-		//	siftpoints1[matchedpoints[i].input_num].column == siftpoints1[matchedpoints[i + step].input_num].column)
-		//{
-		//	next_min_index = matchedpoints[min_dist_index].eu_distance > matchedpoints[i + step].eu_distance ? min_dist_index : (i + step);
-		//	min_dist_index = matchedpoints[min_dist_index].eu_distance > matchedpoints[i + step].eu_distance ? (i+step): min_dist_index;
-		//	++step;
-		//}
-		//for (int j = 1;j<=step&&i+j<matchedpoints.size();++j)
-		//{
-		//	if (matchedpoints[next_min_index].eu_distance>matchedpoints[i+j].eu_distance&&
-		//		matchedpoints[i+j].eu_distance!=matchedpoints[min_dist_index].eu_distance)
-		//	{
-		//		next_min_index = i + j;
-		//		break;
-		//	}
-		//}
-		//if (next_min_index == min_dist_index || matchedpoints[min_dist_index].eu_distance / matchedpoints[next_min_index].eu_distance <= 0.8)
-		//{
-		//	Point pt1 = Point(siftpoints1[matchedpoints[min_dist_index].input_num].column, siftpoints1[matchedpoints[min_dist_index].input_num].row);
-		//	Point pt2 = Point(siftpoints2[matchedpoints[min_dist_index].compare_num].column + src1.cols, siftpoints2[matchedpoints[min_dist_index].compare_num].row);
-		//	circle(output, pt1, 3, Scalar(10 * i % 255, i % 255, 5 * i % 255), 2, 10);
-		//	circle(output, pt2, 3, Scalar(10 * i % 255, i % 255, 5 * i % 255), 2, 10);
-		//	line(output, pt1, pt2, Scalar(10*i%255, i%255, 5*i%255),2);
-		//	sum++;
-		//}
 		i += step;
 	}
 	printf("%d,%d",matchedpoints.size(),sum);
@@ -695,29 +693,14 @@ void showSiftPoints(std::string title,Mat src, std::vector<SFKP>& siftpoints, in
 		float y = siftpoints[i].column;
 		y += siftpoints[i].offset[1] * (float)(siftpoints[i].octave_num>0?1 << (siftpoints[i].octave_num-1):0.5);
 		Point ptstart(y,x);
-		//if ((int)y==7&&(int)x==6)
-		//{
-		//	//printf("%f", siftpoints[i].orientation);
-		//	for (int m = 0; m < 4; m++)
-		//	{
-		//		for (int n = 0; n < 4; n++)
-		//		{
-		//			for (int k = 0; k < 8; k++)
-		//			{
-		//				printf("%f,", siftpoints[i].descripter[m][n][k]);
-		//			}
-		//		}
-		//	}
-		//	printf("\n");
-		//}
 		circle(src,ptstart,radius, sc,1,linetype);
 		int r = siftpoints[i].layer_num + 1;
 		float s_radius = mat_size[r] << siftpoints[i].octave_num;//siftpoints[i].octave_num>0?mat_size[r]<<(siftpoints[i].octave_num-1):mat_size[r]>>1;
 		float dy = cos(siftpoints[i].orientation * Pi / 180.f );
 		float dx = sin(siftpoints[i].orientation  * Pi / 180.f);
 		//float dx = sin(siftpoints[i].orientation * 10 < 180 ? siftpoints[i].orientation * 10 * Pi / 180.f : siftpoints[i].orientation * 10 * Pi / 180.f - Pi);
-		Point ptend(y + s_radius*dx, x + s_radius*dy);
-		f1 <<y << "," << x <<","<< siftpoints[i].column + radius*cos(dy)<<","<< siftpoints[i].row + radius*sin(dx)<<std::endl;
+		Point ptend(y + s_radius*dy, x + s_radius*dx);
+		f1 <<y << "," << x <<","<< y + s_radius*dy<<","<< x + s_radius*dx<<std::endl;
 		line(src, ptstart, ptend, sc);
 	}
 	f1.close();
@@ -755,6 +738,13 @@ void matchSiftPoints(std::vector<SFKP>& siftpoints1, std::vector<SFKP>& siftpoin
 			//t_distance = sqrt(t_distance);
 			if (t_distance < dis_threshold)
 			{
+				MP *mp = (MP*)malloc(sizeof(MP));
+				mp->compare_num = r;
+				mp->input_num = o;
+				mp->eu_distance = t_distance;
+				mp->rotation = siftpoints1[o].orientation - siftpoints2[r].orientation;
+				matchPoints.push_back(*mp);
+				rotate_angle += mp->rotation;
 				sec_dist = t_distance;
 				if (min_dist>t_distance)
 				{
@@ -764,9 +754,9 @@ void matchSiftPoints(std::vector<SFKP>& siftpoints1, std::vector<SFKP>& siftpoin
 				}
 			}
 		}
-		if (cp_pos>-1)
+		/*if (cp_pos>-1)
 		{
-			if (min_dist/sec_dist<=0.8 || min_dist == sec_dist)
+			if (min_dist/sec_dist<0.8 || min_dist == sec_dist)
 			{
 				MP *mp = (MP*)malloc(sizeof(MP));
 				mp->compare_num = cp_pos;
@@ -776,7 +766,7 @@ void matchSiftPoints(std::vector<SFKP>& siftpoints1, std::vector<SFKP>& siftpoin
 				matchPoints.push_back(*mp);
 				rotate_angle += mp->rotation;
 			}
-		}
+		}*/
 	}
 	rotate_angle /= matchPoints.size();
 }
